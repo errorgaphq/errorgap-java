@@ -1,4 +1,4 @@
-package io.errorgap.spring;
+package com.errorgap.spring;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

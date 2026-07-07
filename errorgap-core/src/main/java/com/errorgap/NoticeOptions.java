@@ -1,4 +1,4 @@
-package io.errorgap;
+package com.errorgap;
 
 import java.util.Map;
 

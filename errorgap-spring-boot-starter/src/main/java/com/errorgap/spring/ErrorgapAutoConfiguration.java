@@ -1,6 +1,6 @@
-package io.errorgap.spring;
+package com.errorgap.spring;
 
-import io.errorgap.Client;
+import com.errorgap.Client;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -16,8 +16,8 @@ public class ErrorgapAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    public io.errorgap.Configuration errorgapConfiguration(ErrorgapProperties props) {
-        io.errorgap.Configuration cfg = new io.errorgap.Configuration();
+    public com.errorgap.Configuration errorgapConfiguration(ErrorgapProperties props) {
+        com.errorgap.Configuration cfg = new com.errorgap.Configuration();
         if (props.getEndpoint() != null) cfg.setEndpoint(props.getEndpoint());
         if (props.getProjectSlug() != null) cfg.setProjectSlug(props.getProjectSlug());
         if (props.getProjectId() != null) cfg.setProjectId(props.getProjectId());
@@ -31,7 +31,7 @@ public class ErrorgapAutoConfiguration {
 
     @Bean(destroyMethod = "")
     @ConditionalOnMissingBean
-    public Client errorgapClient(io.errorgap.Configuration cfg) {
+    public Client errorgapClient(com.errorgap.Configuration cfg) {
         return new Client(cfg);
     }
 

@@ -1,4 +1,4 @@
-package io.errorgap;
+package com.errorgap;
 
 import org.junit.jupiter.api.Test;
 

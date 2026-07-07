@@ -2,8 +2,8 @@
 
 JVM notifier for [Errorgap](https://errorgap.com). Two artifacts:
 
-- `io.errorgap:errorgap-core` — base SDK with no framework deps
-- `io.errorgap:errorgap-spring-boot-starter` — Spring Boot 3.x auto-config
+- `com.errorgap:errorgap-core` — base SDK with no framework deps
+- `com.errorgap:errorgap-spring-boot-starter` — Spring Boot 3.x auto-config
 
 Requires Java 17+.
 
@@ -11,7 +11,7 @@ Requires Java 17+.
 
 ```xml
 <dependency>
-  <groupId>io.errorgap</groupId>
+  <groupId>com.errorgap</groupId>
   <artifactId>errorgap-spring-boot-starter</artifactId>
   <version>0.1.0</version>
 </dependency>
@@ -38,8 +38,8 @@ Beans are only registered when `errorgap.project-slug` is set.
 ## Configure (plain Java)
 
 ```java
-import io.errorgap.Configuration;
-import io.errorgap.Errorgap;
+import com.errorgap.Configuration;
+import com.errorgap.Errorgap;
 
 Configuration cfg = new Configuration()
     .setEndpoint("https://errorgap.example.com")

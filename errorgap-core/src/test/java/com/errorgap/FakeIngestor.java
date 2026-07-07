@@ -1,4 +1,4 @@
-package io.errorgap;
+package com.errorgap;
 
 import com.sun.net.httpserver.HttpServer;
 

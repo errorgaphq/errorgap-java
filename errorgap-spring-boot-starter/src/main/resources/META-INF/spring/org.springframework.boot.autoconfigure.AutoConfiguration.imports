@@ -1,1 +1,1 @@
-io.errorgap.spring.ErrorgapAutoConfiguration
+com.errorgap.spring.ErrorgapAutoConfiguration

@@ -1,7 +1,7 @@
-package io.errorgap.spring;
+package com.errorgap.spring;
 
-import io.errorgap.Client;
-import io.errorgap.NoticeOptions;
+import com.errorgap.Client;
+import com.errorgap.NoticeOptions;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.core.Ordered;

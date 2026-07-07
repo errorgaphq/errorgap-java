@@ -1,7 +1,7 @@
-package io.errorgap.spring;
+package com.errorgap.spring;
 
-import io.errorgap.Client;
-import io.errorgap.Configuration;
+import com.errorgap.Client;
+import com.errorgap.Configuration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
