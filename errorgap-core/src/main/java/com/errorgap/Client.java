@@ -52,7 +52,12 @@ public class Client {
             if (sync || !configuration.isAsync()) {
                 return deliver(notice);
             }
+            // Count at enqueue time: if the worker decremented only around
+            // delivery, flush() could observe an empty queue in the gap
+            // between poll() and the in-flight increment and return early.
+            inFlight.incrementAndGet();
             if (!queue.offer(notice)) {
+                inFlight.decrementAndGet();
                 log("notice dropped, queue full");
                 return new Result(null, null, new RuntimeException("queue full"), false);
             }
@@ -65,7 +70,7 @@ public class Client {
 
     public void flush(Duration timeout) throws InterruptedException {
         long deadline = System.nanoTime() + timeout.toNanos();
-        while (!queue.isEmpty() || inFlight.get() > 0) {
+        while (inFlight.get() > 0) {
             if (System.nanoTime() >= deadline) {
                 return;
             }
@@ -86,7 +91,6 @@ public class Client {
             try {
                 Notice notice = queue.poll(100, TimeUnit.MILLISECONDS);
                 if (notice != null) {
-                    inFlight.incrementAndGet();
                     try {
                         deliver(notice);
                     } finally {
