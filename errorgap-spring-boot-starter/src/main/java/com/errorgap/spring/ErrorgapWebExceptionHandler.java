@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.web.servlet.HandlerExceptionResolver;
+import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.servlet.ModelAndView;
 
 import java.util.LinkedHashMap;
@@ -38,7 +39,9 @@ public class ErrorgapWebExceptionHandler implements HandlerExceptionResolver {
         Map<String, Object> ctx = new LinkedHashMap<>();
         ctx.put("source", "spring.HandlerExceptionResolver");
         ctx.put("url", request.getRequestURL().toString());
-        ctx.put("component", request.getRequestURI());
+        Object route = request.getAttribute(HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE);
+        ctx.put("component", route == null ? request.getRequestURI() : String.valueOf(route));
+        if (route != null) ctx.put("route", String.valueOf(route));
         ctx.put("action", request.getMethod());
         opts.context = ctx;
 
@@ -49,6 +52,15 @@ public class ErrorgapWebExceptionHandler implements HandlerExceptionResolver {
         env.put("user_agent", request.getHeader("user-agent"));
         env.put("remote_addr", request.getRemoteAddr());
         opts.environment = env;
+
+        Map<String, Object> params = new LinkedHashMap<>();
+        request.getParameterMap().forEach((key, values) ->
+            params.put(key, values.length == 1 ? values[0] : java.util.List.of(values))
+        );
+        opts.params = params;
+        if (request.getUserPrincipal() != null) {
+            opts.session = Map.of("user_id", request.getUserPrincipal().getName());
+        }
 
         client.notify(ex, opts, true);
 

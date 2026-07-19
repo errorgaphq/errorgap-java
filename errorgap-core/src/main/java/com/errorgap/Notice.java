@@ -77,6 +77,12 @@ public final class Notice {
         if (frame.function() != null) map.put("function", frame.function());
         map.put("in_app", frame.inApp());
         map.put("index", frame.index());
+        if (frame.source() != null) {
+            Map<String, Object> source = new LinkedHashMap<>();
+            source.put("start_line", frame.source().startLine());
+            source.put("lines", frame.source().lines());
+            map.put("source", source);
+        }
         return map;
     }
 

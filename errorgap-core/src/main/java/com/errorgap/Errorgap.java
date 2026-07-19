@@ -55,6 +55,14 @@ public final class Errorgap {
         return c.notify(throwable, options);
     }
 
+    public static Client.Result notifyTransaction(ApmTransaction transaction) {
+        Client c = defaultClient;
+        if (c == null) {
+            return new Client.Result(null, null, new IllegalStateException("Errorgap not initialized"), false);
+        }
+        return c.notifyTransaction(transaction);
+    }
+
     public static void flush(Duration timeout) throws InterruptedException {
         Client c = defaultClient;
         if (c != null) {

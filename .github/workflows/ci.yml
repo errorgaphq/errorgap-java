@@ -5,6 +5,10 @@ on:
   pull_request:
 jobs:
   test:
+    strategy:
+      fail-fast: false
+      matrix:
+        spring-boot: ["3.5.14", "4.1.0"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,4 +17,4 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
-      - run: mvn -B verify
+      - run: mvn -B -Dspring.boot.version=${{ matrix.spring-boot }} verify

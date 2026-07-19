@@ -13,6 +13,9 @@ public class ErrorgapProperties {
     private String release;
     private Boolean async;
     private Integer timeoutSeconds;
+    private Boolean apmEnabled;
+    private Double apmSampleRate;
+    private String rootDirectory;
 
     public String getEndpoint() { return endpoint; }
     public void setEndpoint(String endpoint) { this.endpoint = endpoint; }
@@ -37,4 +40,13 @@ public class ErrorgapProperties {
 
     public Integer getTimeoutSeconds() { return timeoutSeconds; }
     public void setTimeoutSeconds(Integer timeoutSeconds) { this.timeoutSeconds = timeoutSeconds; }
+
+    public Boolean getApmEnabled() { return apmEnabled; }
+    public void setApmEnabled(Boolean apmEnabled) { this.apmEnabled = apmEnabled; }
+
+    public Double getApmSampleRate() { return apmSampleRate; }
+    public void setApmSampleRate(Double apmSampleRate) { this.apmSampleRate = apmSampleRate; }
+
+    public String getRootDirectory() { return rootDirectory; }
+    public void setRootDirectory(String rootDirectory) { this.rootDirectory = rootDirectory; }
 }

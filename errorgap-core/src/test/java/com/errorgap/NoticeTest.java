@@ -56,4 +56,20 @@ class NoticeTest {
         List<Map<String, Object>> frames = (List<Map<String, Object>>) notice.errors.get(0).get("backtrace");
         assertFalse(frames.isEmpty());
     }
+
+    @Test
+    void backtraceIncludesInlineJavaSource() {
+        Configuration cfg = new Configuration()
+            .setProjectSlug("demo")
+            .setRootDirectory(System.getProperty("user.dir"));
+        Notice notice = Notice.fromThrowable(new RuntimeException("source"), cfg, new NoticeOptions());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> frames =
+            (List<Map<String, Object>>) notice.errors.get(0).get("backtrace");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> source = (Map<String, Object>) frames.get(0).get("source");
+        assertNotNull(source);
+        assertTrue(((List<?>) source.get("lines")).stream()
+            .anyMatch(line -> line.toString().contains("new RuntimeException")));
+    }
 }

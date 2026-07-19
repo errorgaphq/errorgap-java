@@ -82,4 +82,55 @@ class ClientTest {
             ing.close();
         }
     }
+
+    @Test
+    void postsApmTransactionsWhenEnabled() throws Exception {
+        FakeIngestor ing = new FakeIngestor();
+        try {
+            Configuration cfg = new Configuration()
+                .setEndpoint(ing.endpoint())
+                .setProjectSlug("demo")
+                .setApiKey("flk_test")
+                .setAsync(false)
+                .setApmEnabled(true);
+            Client client = new Client(cfg);
+            try {
+                Client.Result result = client.notifyTransaction(new ApmTransaction()
+                    .setKind("web")
+                    .setMethod("GET")
+                    .setPath("/orders/{id}")
+                    .setStatusCode(200)
+                    .setDurationMs(12.5)
+                    .addSpan(ApmSpan.database("select ?", "Order.java", 42, "find", 2.5)));
+                assertTrue(result.success());
+                FakeIngestor.CapturedRequest req = ing.requests().get(0);
+                assertEquals("/api/projects/demo/transactions", req.path);
+                assertTrue(req.body.contains("\"duration_ms\":12.5"));
+                assertTrue(req.body.contains("\"kind\":\"db\""));
+            } finally {
+                client.close();
+            }
+        } finally {
+            ing.close();
+        }
+    }
+
+    @Test
+    void skipsApmTransactionsWhenDisabled() throws Exception {
+        FakeIngestor ing = new FakeIngestor();
+        try {
+            Client client = new Client(new Configuration()
+                .setEndpoint(ing.endpoint())
+                .setProjectSlug("demo")
+                .setApmEnabled(false));
+            try {
+                assertEquals(204, client.notifyTransaction(new ApmTransaction()).status);
+                assertTrue(ing.requests().isEmpty());
+            } finally {
+                client.close();
+            }
+        } finally {
+            ing.close();
+        }
+    }
 }

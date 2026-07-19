@@ -22,6 +22,8 @@ public final class Configuration {
     private List<String> filterKeys = DEFAULT_FILTER_KEYS;
     private Duration timeout = Duration.ofSeconds(5);
     private int queueSize = 100;
+    private boolean apmEnabled;
+    private double apmSampleRate = 1.0;
 
     public Configuration() {
         this.endpoint = envOr("ERRORGAP_ENDPOINT", "http://127.0.0.1:3030");
@@ -30,11 +32,21 @@ public final class Configuration {
         this.apiKey = System.getenv("ERRORGAP_API_KEY");
         this.environment = envOr("ERRORGAP_ENVIRONMENT", "production");
         this.rootDirectory = System.getProperty("user.dir");
+        this.apmEnabled = Boolean.parseBoolean(envOr("ERRORGAP_APM_ENABLED", "false"));
+        this.apmSampleRate = parseSampleRate(envOr("ERRORGAP_APM_SAMPLE_RATE", "1"));
     }
 
     private static String envOr(String key, String fallback) {
         String v = System.getenv(key);
         return v == null || v.isBlank() ? fallback : v;
+    }
+
+    private static double parseSampleRate(String value) {
+        try {
+            return Math.max(0.0, Math.min(1.0, Double.parseDouble(value)));
+        } catch (NumberFormatException ignored) {
+            return 1.0;
+        }
     }
 
     public String getEndpoint() { return endpoint; }
@@ -72,6 +84,15 @@ public final class Configuration {
 
     public int getQueueSize() { return queueSize; }
     public Configuration setQueueSize(int v) { this.queueSize = v; return this; }
+
+    public boolean isApmEnabled() { return apmEnabled; }
+    public Configuration setApmEnabled(boolean v) { this.apmEnabled = v; return this; }
+
+    public double getApmSampleRate() { return apmSampleRate; }
+    public Configuration setApmSampleRate(double v) {
+        this.apmSampleRate = Math.max(0.0, Math.min(1.0, v));
+        return this;
+    }
 
     public void validate() {
         if (projectSlug == null || projectSlug.isBlank()) {

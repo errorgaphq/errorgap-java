@@ -38,4 +38,20 @@ class AutoConfigurationTest {
             assertThat(cfg.getEndpoint()).isEqualTo("https://errorgap.example.com");
         });
     }
+
+    @Test
+    void registersApmBeansAndConfiguration() {
+        runner.withPropertyValues(
+            "errorgap.project-slug=demo",
+            "errorgap.apm-enabled=true",
+            "errorgap.apm-sample-rate=0.75"
+        ).run(ctx -> {
+            assertThat(ctx).hasSingleBean(QuerySpanCollector.class);
+            assertThat(ctx).hasSingleBean(ErrorgapWebFilter.class);
+            assertThat(ctx).hasSingleBean(ErrorgapApm.class);
+            assertThat(ctx).hasSingleBean(ErrorgapDataSourceBeanPostProcessor.class);
+            assertThat(ctx.getBean(Configuration.class).isApmEnabled()).isTrue();
+            assertThat(ctx.getBean(Configuration.class).getApmSampleRate()).isEqualTo(0.75);
+        });
+    }
 }

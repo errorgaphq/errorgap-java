@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.time.Duration;
 
@@ -26,10 +27,13 @@ public class ErrorgapAutoConfiguration {
         if (props.getRelease() != null) cfg.setRelease(props.getRelease());
         if (props.getAsync() != null) cfg.setAsync(props.getAsync());
         if (props.getTimeoutSeconds() != null) cfg.setTimeout(Duration.ofSeconds(props.getTimeoutSeconds()));
+        if (props.getApmEnabled() != null) cfg.setApmEnabled(props.getApmEnabled());
+        if (props.getApmSampleRate() != null) cfg.setApmSampleRate(props.getApmSampleRate());
+        if (props.getRootDirectory() != null) cfg.setRootDirectory(props.getRootDirectory());
         return cfg;
     }
 
-    @Bean(destroyMethod = "")
+    @Bean(destroyMethod = "close")
     @ConditionalOnMissingBean
     public Client errorgapClient(com.errorgap.Configuration cfg) {
         return new Client(cfg);
@@ -39,5 +43,31 @@ public class ErrorgapAutoConfiguration {
     @ConditionalOnMissingBean
     public ErrorgapWebExceptionHandler errorgapWebExceptionHandler(Client client) {
         return new ErrorgapWebExceptionHandler(client);
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "errorgap", name = "apm-enabled", havingValue = "true")
+    public QuerySpanCollector errorgapQuerySpanCollector() {
+        return new QuerySpanCollector();
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "errorgap", name = "apm-enabled", havingValue = "true")
+    public ErrorgapWebFilter errorgapWebFilter(Client client, QuerySpanCollector spans) {
+        return new ErrorgapWebFilter(client, spans);
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "errorgap", name = "apm-enabled", havingValue = "true")
+    public ErrorgapApm errorgapApm(Client client, QuerySpanCollector spans) {
+        return new ErrorgapApm(client, spans);
+    }
+
+    @Bean
+    @ConditionalOnProperty(prefix = "errorgap", name = "apm-enabled", havingValue = "true")
+    public static ErrorgapDataSourceBeanPostProcessor errorgapDataSourceBeanPostProcessor(
+        ObjectProvider<QuerySpanCollector> spans
+    ) {
+        return new ErrorgapDataSourceBeanPostProcessor(spans::getObject);
     }
 }

@@ -6,14 +6,15 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class Client {
+public class Client implements AutoCloseable {
 
     private volatile Configuration configuration;
     private final HttpClient httpClient;
-    private final LinkedBlockingQueue<Notice> queue;
+    private final LinkedBlockingQueue<Delivery> queue;
     private final AtomicInteger inFlight = new AtomicInteger(0);
     private final Thread worker;
     private volatile boolean running = true;
@@ -49,23 +50,50 @@ public class Client {
         try {
             configuration.validate();
             Notice notice = Notice.fromThrowable(throwable, configuration, options);
-            if (sync || !configuration.isAsync()) {
-                return deliver(notice);
-            }
-            // Count at enqueue time: if the worker decremented only around
-            // delivery, flush() could observe an empty queue in the gap
-            // between poll() and the in-flight increment and return early.
-            inFlight.incrementAndGet();
-            if (!queue.offer(notice)) {
-                inFlight.decrementAndGet();
-                log("notice dropped, queue full");
-                return new Result(null, null, new RuntimeException("queue full"), false);
-            }
-            return new Result(202, null, null, true);
+            return submit(new Delivery(noticesUrl(), Json.encode(notice.toMap())), sync);
         } catch (Throwable caught) {
             log(caught.getClass().getSimpleName() + ": " + caught.getMessage());
             return new Result(null, null, caught, false);
         }
+    }
+
+    public Result notifyTransaction(ApmTransaction transaction) {
+        return notifyTransaction(transaction, false);
+    }
+
+    public Result notifyTransaction(ApmTransaction transaction, boolean sync) {
+        try {
+            configuration.validate();
+            if (!configuration.isApmEnabled()
+                || configuration.getApmSampleRate() <= 0
+                || (configuration.getApmSampleRate() < 1
+                    && ThreadLocalRandom.current().nextDouble() >= configuration.getApmSampleRate())) {
+                return new Result(204, null, null, false);
+            }
+            return submit(
+                new Delivery(transactionsUrl(), Json.encode(transaction.toMap(configuration))),
+                sync
+            );
+        } catch (Throwable caught) {
+            log(caught.getClass().getSimpleName() + ": " + caught.getMessage());
+            return new Result(null, null, caught, false);
+        }
+    }
+
+    private Result submit(Delivery delivery, boolean sync) {
+        if (sync || !configuration.isAsync()) {
+            return deliver(delivery);
+        }
+        // Count at enqueue time: if the worker decremented only around
+        // delivery, flush() could observe an empty queue in the gap
+        // between poll() and the in-flight increment and return early.
+        inFlight.incrementAndGet();
+        if (!queue.offer(delivery)) {
+            inFlight.decrementAndGet();
+            log("payload dropped, queue full");
+            return new Result(null, null, new RuntimeException("queue full"), false);
+        }
+        return new Result(202, null, null, true);
     }
 
     public void flush(Duration timeout) throws InterruptedException {
@@ -86,13 +114,22 @@ public class Client {
         worker.join(timeout.toMillis());
     }
 
+    @Override
+    public void close() {
+        try {
+            shutdown(Duration.ofSeconds(5));
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     private void loop() {
         while (running) {
             try {
-                Notice notice = queue.poll(100, TimeUnit.MILLISECONDS);
-                if (notice != null) {
+                Delivery delivery = queue.poll(100, TimeUnit.MILLISECONDS);
+                if (delivery != null) {
                     try {
-                        deliver(notice);
+                        deliver(delivery);
                     } finally {
                         inFlight.decrementAndGet();
                     }
@@ -104,15 +141,13 @@ public class Client {
         }
     }
 
-    Result deliver(Notice notice) {
-        String url = noticesUrl();
-        String body = Json.encode(notice.toMap());
+    Result deliver(Delivery delivery) {
         HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
-            .uri(URI.create(url))
+            .uri(URI.create(delivery.url()))
             .timeout(configuration.getTimeout())
             .header("content-type", "application/json")
             .header("user-agent", "errorgap-java/" + Version.VERSION)
-            .POST(HttpRequest.BodyPublishers.ofString(body));
+            .POST(HttpRequest.BodyPublishers.ofString(delivery.body()));
 
         if (configuration.getApiKey() != null && !configuration.getApiKey().isBlank()) {
             reqBuilder.header("x-errorgap-project-key", configuration.getApiKey());
@@ -120,6 +155,9 @@ public class Client {
 
         try {
             HttpResponse<String> response = httpClient.send(reqBuilder.build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                log("delivery failed with HTTP " + response.statusCode() + ": " + response.body());
+            }
             return new Result(response.statusCode(), response.body(), null, false);
         } catch (Throwable caught) {
             log(caught.getClass().getSimpleName() + ": " + caught.getMessage());
@@ -128,17 +166,28 @@ public class Client {
     }
 
     private String noticesUrl() {
+        return projectUrl("notices");
+    }
+
+    private String transactionsUrl() {
+        return projectUrl("transactions");
+    }
+
+    private String projectUrl(String resource) {
         String base = configuration.getEndpoint();
         if (base.endsWith("/")) {
             base = base.substring(0, base.length() - 1);
         }
-        return base + "/api/projects/" + configuration.getProjectSlug() + "/notices";
+        return base + "/api/projects/" + configuration.getProjectSlug() + "/" + resource;
     }
 
     private void log(String message) {
         if (configuration.getLogger() != null) {
             configuration.getLogger().accept("[errorgap] " + message);
         }
+    }
+
+    record Delivery(String url, String body) {
     }
 
     public static final class Result {
