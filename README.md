@@ -13,7 +13,7 @@ Requires Java 17+.
 <dependency>
   <groupId>com.errorgap</groupId>
   <artifactId>errorgap-spring-boot-starter</artifactId>
-  <version>0.2.0</version>
+  <version>0.3.0</version>
 </dependency>
 ```
 
@@ -66,6 +66,24 @@ errorgapApm.trackJob(
 
 The wrapper reports job duration, status, queue, captured JDBC spans, and the
 exception when the job fails. It rethrows the original runtime exception.
+
+### Link errors to their request
+
+Every `ApmTransaction` has an id. The Spring filter and `ErrorgapApm.trackJob`
+make it current while the request or job runs, so errors reported then —
+including by Spring's exception handlers — carry it as
+`context.transaction_id`, and errorgap shows the error a request actually
+raised on its trace. For your own instrumentation:
+
+```java
+ApmTransaction transaction = new ApmTransaction().setMethod("GET").setPath("/orders/{id}");
+try (TransactionContext.Scope scope = TransactionContext.enter(transaction.getId())) {
+    handle(request);
+}
+client.notifyTransaction(transaction.setStatusCode(200));
+```
+
+The id is thread-local; work handed to another thread needs its own scope.
 
 ## Source excerpts
 

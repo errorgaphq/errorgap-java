@@ -3,6 +3,7 @@ package com.errorgap.spring;
 import com.errorgap.ApmTransaction;
 import com.errorgap.Client;
 import com.errorgap.NoticeOptions;
+import com.errorgap.TransactionContext;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -20,6 +21,8 @@ public class ErrorgapApm {
     public void trackJob(String jobClass, String queue, Runnable operation) {
         long started = System.nanoTime();
         Throwable failure = null;
+        ApmTransaction transaction = new ApmTransaction();
+        TransactionContext.Scope scope = TransactionContext.enter(transaction.getId());
         spans.begin();
         try {
             operation.run();
@@ -37,7 +40,9 @@ public class ErrorgapApm {
                     .context(context)
                     .environment(Map.of("queue", queue == null ? "default" : queue)), true);
             }
-            client.notifyTransaction(new ApmTransaction()
+            // Reported above while the job's id was still current.
+            scope.close();
+            client.notifyTransaction(transaction
                 .setKind("job")
                 .setJobClass(jobClass)
                 .setQueue(queue == null ? "default" : queue)
