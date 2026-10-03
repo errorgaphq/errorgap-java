@@ -5,8 +5,11 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public final class ApmTransaction {
+    /** Links errors raised during this transaction to it; see {@link TransactionContext}. */
+    private String id = UUID.randomUUID().toString();
     private String kind = "web";
     private String method;
     private String path;
@@ -19,6 +22,7 @@ public final class ApmTransaction {
     private String jobClass;
     private String queue;
 
+    public String getId() { return id; }
     public String getKind() { return kind; }
     public String getMethod() { return method; }
     public String getPath() { return path; }
@@ -28,6 +32,7 @@ public final class ApmTransaction {
     public List<ApmSpan> getSpans() { return List.copyOf(spans); }
     public String getJobClass() { return jobClass; }
     public String getQueue() { return queue; }
+    public ApmTransaction setId(String value) { this.id = value; return this; }
     public ApmTransaction setKind(String value) { this.kind = value; return this; }
     public ApmTransaction setMethod(String value) { this.method = value; return this; }
     public ApmTransaction setPath(String value) { this.path = value; return this; }
@@ -46,6 +51,7 @@ public final class ApmTransaction {
 
     Map<String, Object> toMap(Configuration configuration) {
         Map<String, Object> map = new LinkedHashMap<>();
+        if (id != null) map.put("id", id);
         map.put("kind", kind);
         if (method != null) map.put("method", method);
         if (path != null) map.put("path", path);

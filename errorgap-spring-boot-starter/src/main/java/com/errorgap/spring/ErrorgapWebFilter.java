@@ -2,6 +2,7 @@ package com.errorgap.spring;
 
 import com.errorgap.ApmTransaction;
 import com.errorgap.Client;
+import com.errorgap.TransactionContext;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,8 +32,11 @@ public class ErrorgapWebFilter extends OncePerRequestFilter {
         throws ServletException, IOException {
         long started = System.nanoTime();
         Throwable failure = null;
+        // Spring's exception handlers run inside the chain, so errors they
+        // report carry this request's transaction id.
+        ApmTransaction transaction = new ApmTransaction();
         spans.begin();
-        try {
+        try (TransactionContext.Scope scope = TransactionContext.enter(transaction.getId())) {
             filterChain.doFilter(request, response);
         } catch (ServletException | IOException | RuntimeException | Error caught) {
             failure = caught;
@@ -44,7 +48,7 @@ public class ErrorgapWebFilter extends OncePerRequestFilter {
                 ? request.getRequestURI()
                 : String.valueOf(bestPattern);
             int status = failure == null ? response.getStatus() : 500;
-            client.notifyTransaction(new ApmTransaction()
+            client.notifyTransaction(transaction
                 .setKind("web")
                 .setMethod(request.getMethod())
                 .setPath(normalizedPath)

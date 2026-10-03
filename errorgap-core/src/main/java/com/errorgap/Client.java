@@ -49,7 +49,7 @@ public class Client implements AutoCloseable {
     public Result notify(Throwable throwable, NoticeOptions options, boolean sync) {
         try {
             configuration.validate();
-            Notice notice = Notice.fromThrowable(throwable, configuration, options);
+            Notice notice = Notice.fromThrowable(throwable, configuration, withTransaction(options));
             return submit(new Delivery(noticesUrl(), Json.encode(notice.toMap())), sync);
         } catch (Throwable caught) {
             log(caught.getClass().getSimpleName() + ": " + caught.getMessage());
@@ -167,6 +167,27 @@ public class Client implements AutoCloseable {
 
     private String noticesUrl() {
         return projectUrl("notices");
+    }
+
+    /**
+     * The request or job this error was raised in ({@link TransactionContext}),
+     * unless the caller set one, so errorgap links the two.
+     */
+    private static NoticeOptions withTransaction(NoticeOptions options) {
+        String id = TransactionContext.current();
+        NoticeOptions resolved = options == null ? new NoticeOptions() : options;
+        if (id == null || (resolved.context != null && resolved.context.containsKey("transaction_id"))) {
+            return resolved;
+        }
+        java.util.Map<String, Object> context = resolved.context == null
+            ? new java.util.LinkedHashMap<>()
+            : new java.util.LinkedHashMap<>(resolved.context);
+        context.put("transaction_id", id);
+        return new NoticeOptions()
+            .context(context)
+            .environment(resolved.environment)
+            .session(resolved.session)
+            .params(resolved.params);
     }
 
     private String transactionsUrl() {
