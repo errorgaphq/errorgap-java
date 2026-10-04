@@ -13,7 +13,7 @@ Requires Java 17+.
 <dependency>
   <groupId>com.errorgap</groupId>
   <artifactId>errorgap-spring-boot-starter</artifactId>
-  <version>0.3.0</version>
+  <version>0.4.0</version>
 </dependency>
 ```
 
@@ -66,6 +66,14 @@ errorgapApm.trackJob(
 
 The wrapper reports job duration, status, queue, captured JDBC spans, and the
 exception when the job fails. It rethrows the original runtime exception.
+
+### Link browser calls to their request
+
+When the errorgap browser SDK is on the page, its API calls send an
+`x-errorgap-trace` header. The Spring filter records it as the transaction's
+trace id (for your own instrumentation: `transaction.setTraceId(ApmTransaction.browserTraceId(header))`),
+so errorgap's browser Performance view links each call to the server request
+that answered it.
 
 ### Link errors to their request
 

@@ -4,7 +4,7 @@
 
   <groupId>com.errorgap</groupId>
   <artifactId>errorgap-parent</artifactId>
-  <version>0.3.0</version>
+  <version>0.4.0</version>
   <packaging>pom</packaging>
   <name>Errorgap JVM SDK (parent)</name>
   <description>JVM notifier for Errorgap error tracking.</description>

@@ -49,6 +49,7 @@ public class ErrorgapWebFilter extends OncePerRequestFilter {
                 : String.valueOf(bestPattern);
             int status = failure == null ? response.getStatus() : 500;
             client.notifyTransaction(transaction
+                .setTraceId(ApmTransaction.browserTraceId(request.getHeader(ApmTransaction.TRACE_HEADER)))
                 .setKind("web")
                 .setMethod(request.getMethod())
                 .setPath(normalizedPath)

@@ -10,6 +10,8 @@ import java.util.UUID;
 public final class ApmTransaction {
     /** Links errors raised during this transaction to it; see {@link TransactionContext}. */
     private String id = UUID.randomUUID().toString();
+    /** The browser's x-errorgap-trace header; see {@link #browserTraceId(String)}. */
+    private String traceId;
     private String kind = "web";
     private String method;
     private String path;
@@ -23,6 +25,7 @@ public final class ApmTransaction {
     private String queue;
 
     public String getId() { return id; }
+    public String getTraceId() { return traceId; }
     public String getKind() { return kind; }
     public String getMethod() { return method; }
     public String getPath() { return path; }
@@ -33,6 +36,7 @@ public final class ApmTransaction {
     public String getJobClass() { return jobClass; }
     public String getQueue() { return queue; }
     public ApmTransaction setId(String value) { this.id = value; return this; }
+    public ApmTransaction setTraceId(String value) { this.traceId = value; return this; }
     public ApmTransaction setKind(String value) { this.kind = value; return this; }
     public ApmTransaction setMethod(String value) { this.method = value; return this; }
     public ApmTransaction setPath(String value) { this.path = value; return this; }
@@ -49,9 +53,27 @@ public final class ApmTransaction {
     public ApmTransaction setJobClass(String value) { this.jobClass = value; return this; }
     public ApmTransaction setQueue(String value) { this.queue = value; return this; }
 
+    /** The header the errorgap browser SDK sends with API calls. */
+    public static final String TRACE_HEADER = "x-errorgap-trace";
+
+    private static final java.util.regex.Pattern UUID_PATTERN =
+        java.util.regex.Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
+
+    /**
+     * The trace id in an x-errorgap-trace header value, lowercased, or null
+     * unless it is a well-formed UUID. Errorgap links the browser's view of
+     * an API call to the transaction that carries it.
+     */
+    public static String browserTraceId(String header) {
+        if (header == null) return null;
+        String value = header.trim().toLowerCase(java.util.Locale.ROOT);
+        return UUID_PATTERN.matcher(value).matches() ? value : null;
+    }
+
     Map<String, Object> toMap(Configuration configuration) {
         Map<String, Object> map = new LinkedHashMap<>();
         if (id != null) map.put("id", id);
+        if (traceId != null) map.put("trace_id", traceId);
         map.put("kind", kind);
         if (method != null) map.put("method", method);
         if (path != null) map.put("path", path);
