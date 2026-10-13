@@ -93,6 +93,16 @@ client.notifyTransaction(transaction.setStatusCode(200));
 
 The id is thread-local; work handed to another thread needs its own scope.
 
+## Logback
+
+```xml
+<appender name="ERRORGAP" class="com.errorgap.logback.ErrorgapAppender"/>
+<root level="INFO"><appender-ref ref="ERRORGAP"/></root>
+```
+
+`log.error("…", exception)` reports that exception; an error event without one
+is reported as a `LoggedError`. ERROR and above unless `minimumLevel` is set.
+
 ## Filtering, hooks and delivery
 
 ```java

@@ -13,6 +13,14 @@
   <description>Core JVM notifier for Errorgap.</description>
 
   <dependencies>
+    <!-- Only for com.errorgap.logback.ErrorgapAppender: apps that use it
+         already have Logback, so it is not passed on to the rest. -->
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <version>1.5.6</version>
+      <optional>true</optional>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
