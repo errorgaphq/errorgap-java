@@ -13,7 +13,7 @@ Requires Java 17+.
 <dependency>
   <groupId>com.errorgap</groupId>
   <artifactId>errorgap-spring-boot-starter</artifactId>
-  <version>0.4.0</version>
+  <version>0.5.0</version>
 </dependency>
 ```
 
@@ -92,6 +92,23 @@ client.notifyTransaction(transaction.setStatusCode(200));
 ```
 
 The id is thread-local; work handed to another thread needs its own scope.
+
+## Filtering, hooks and delivery
+
+```java
+new Configuration()
+    .setProjectSlug("my-app")
+    .setIgnoreEnvironments(List.of("test"))
+    .setBeforeNotify(notice -> {
+        // return null to drop the notice, or return it changed
+        return notice;
+    });
+```
+
+`filterKeys` are masked at any depth in `params` and `session`, inside lists
+too, and oversized values are cut. A send that fails on the network or with a
+5xx is retried up to three times; after a 429 the client stops sending for the
+server's `Retry-After`.
 
 ## Source excerpts
 

@@ -65,7 +65,7 @@ public final class Notice {
             List.of(err),
             defaultContext,
             options.environment == null ? new LinkedHashMap<>() : options.environment,
-            options.session == null ? new LinkedHashMap<>() : options.session,
+            Filter.params(options.session, config.getFilterKeys()),
             Filter.params(options.params, config.getFilterKeys())
         );
     }

@@ -11,6 +11,15 @@ public final class Filter {
     private Filter() {
     }
 
+    public static final String TRUNCATED = "[TRUNCATED]";
+    private static final int MAX_STRING = 4096;
+    private static final int MAX_ITEMS = 128;
+    private static final int MAX_DEPTH = 8;
+
+    /**
+     * Mask sensitive keys at any depth (inside lists too) and cut long
+     * strings and large or deeply nested collections.
+     */
     public static Map<String, Object> params(Map<String, Object> params, List<String> filterKeys) {
         if (params == null || params.isEmpty()) {
             return new LinkedHashMap<>();
@@ -18,24 +27,49 @@ public final class Filter {
         List<String> lowered = filterKeys.stream()
             .map(k -> k.toLowerCase(Locale.ROOT))
             .toList();
-        return walk(params, lowered);
+        return walkMap(params, lowered, 0);
     }
 
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> walk(Map<String, Object> in, List<String> lowered) {
-        Map<String, Object> out = new LinkedHashMap<>(in.size());
-        for (Map.Entry<String, Object> entry : in.entrySet()) {
-            String key = entry.getKey();
-            Object value = entry.getValue();
-            if (isSensitive(key, lowered)) {
-                out.put(key, FILTERED);
-            } else if (value instanceof Map<?, ?> nested) {
-                out.put(key, walk((Map<String, Object>) nested, lowered));
-            } else {
-                out.put(key, value);
+    public static String string(String value, int limit) {
+        return value != null && value.length() > limit ? value.substring(0, limit) + TRUNCATED : value;
+    }
+
+    private static Map<String, Object> walkMap(Map<?, ?> in, List<String> lowered, int depth) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> entry : in.entrySet()) {
+            if (out.size() >= MAX_ITEMS) {
+                break;
             }
+            String key = String.valueOf(entry.getKey());
+            out.put(key, isSensitive(key, lowered) ? FILTERED : walk(entry.getValue(), lowered, depth + 1));
         }
         return out;
+    }
+
+    private static Object walk(Object value, List<String> lowered, int depth) {
+        if (value instanceof String text) {
+            return string(text, MAX_STRING);
+        }
+        if (value instanceof Map<?, ?> nested) {
+            return depth >= MAX_DEPTH ? TRUNCATED : walkMap(nested, lowered, depth);
+        }
+        if (value instanceof Iterable<?> items) {
+            if (depth >= MAX_DEPTH) {
+                return TRUNCATED;
+            }
+            java.util.ArrayList<Object> out = new java.util.ArrayList<>();
+            for (Object item : items) {
+                if (out.size() >= MAX_ITEMS) {
+                    break;
+                }
+                out.add(walk(item, lowered, depth + 1));
+            }
+            return out;
+        }
+        if (value instanceof Object[] array) {
+            return walk(java.util.Arrays.asList(array), lowered, depth);
+        }
+        return value;
     }
 
     private static boolean isSensitive(String key, List<String> lowered) {
@@ -44,7 +78,7 @@ public final class Filter {
         }
         String lk = key.toLowerCase(Locale.ROOT);
         for (String needle : lowered) {
-            if (lk.contains(needle)) {
+            if (!needle.isEmpty() && lk.contains(needle)) {
                 return true;
             }
         }

@@ -49,8 +49,24 @@ public class Client implements AutoCloseable {
     public Result notify(Throwable throwable, NoticeOptions options, boolean sync) {
         try {
             configuration.validate();
+            if (configuration.isIgnoredEnvironment()) {
+                return new Result(202, "ignored environment", null, false);
+            }
             Notice notice = Notice.fromThrowable(throwable, configuration, withTransaction(options));
-            return submit(new Delivery(noticesUrl(), Json.encode(notice.toMap())), sync);
+            java.util.Map<String, Object> payload = notice.toMap();
+            // A hook that throws is logged and skipped: a bug in a filter
+            // must not lose the error it was filtering.
+            if (configuration.getBeforeNotify() != null) {
+                try {
+                    payload = configuration.getBeforeNotify().apply(payload);
+                } catch (Throwable hookError) {
+                    log("beforeNotify failed: " + hookError);
+                }
+                if (payload == null) {
+                    return new Result(202, "dropped by beforeNotify", null, false);
+                }
+            }
+            return submit(new Delivery(noticesUrl(), Json.encode(payload)), sync);
         } catch (Throwable caught) {
             log(caught.getClass().getSimpleName() + ": " + caught.getMessage());
             return new Result(null, null, caught, false);
@@ -81,6 +97,9 @@ public class Client implements AutoCloseable {
     }
 
     private Result submit(Delivery delivery, boolean sync) {
+        if (configuration.isIgnoredEnvironment()) {
+            return new Result(204, null, null, false);
+        }
         if (sync || !configuration.isAsync()) {
             return deliver(delivery);
         }
@@ -129,7 +148,10 @@ public class Client implements AutoCloseable {
                 Delivery delivery = queue.poll(100, TimeUnit.MILLISECONDS);
                 if (delivery != null) {
                     try {
-                        deliver(delivery);
+                        Result result = deliver(delivery);
+                        if (retryable(result)) {
+                            retryLater(delivery);
+                        }
                     } finally {
                         inFlight.decrementAndGet();
                     }
@@ -141,7 +163,81 @@ public class Client implements AutoCloseable {
         }
     }
 
+    /** Not sent: the server asked for a pause ({@code Retry-After}) that has not passed yet. */
+    public static final class RateLimitedException extends RuntimeException {
+        public RateLimitedException() {
+            super("rate limited by the server, not sent");
+        }
+    }
+
+    private static final int MAX_ATTEMPTS = 3;
+    private static final long RETRY_DELAY_MS = 30_000;
+    private static final int BACKLOG_SIZE = 100;
+    private volatile long pausedUntil;
+    private final AtomicInteger backlog = new AtomicInteger(0);
+    private volatile java.util.Timer retryTimer;
+
+    public boolean paused() {
+        return System.currentTimeMillis() < pausedUntil;
+    }
+
+    /**
+     * Network failures and 5xx responses are worth another try. A 4xx is
+     * not: the server understood and refused, and after a 429 the payload is
+     * dropped so a limited project is not sent the same burst again.
+     */
+    static boolean retryable(Result result) {
+        if (result.error instanceof RateLimitedException) {
+            return false;
+        }
+        if (result.error != null) {
+            return true;
+        }
+        return result.status != null && result.status >= 500;
+    }
+
+    private synchronized void retryLater(Delivery delivery) {
+        if (delivery.attempt() >= MAX_ATTEMPTS || backlog.get() >= BACKLOG_SIZE || !running) {
+            return;
+        }
+        if (retryTimer == null) {
+            retryTimer = new java.util.Timer("errorgap-retry", true);
+        }
+        backlog.incrementAndGet();
+        Delivery again = new Delivery(delivery.url(), delivery.body(), delivery.attempt() + 1);
+        retryTimer.schedule(new java.util.TimerTask() {
+            @Override
+            public void run() {
+                backlog.decrementAndGet();
+                if (!running) {
+                    return;
+                }
+                inFlight.incrementAndGet();
+                if (!queue.offer(again)) {
+                    inFlight.decrementAndGet();
+                }
+            }
+        }, RETRY_DELAY_MS * delivery.attempt());
+    }
+
+    private void pauseFor(String header) {
+        long seconds = 60;
+        try {
+            if (header != null) {
+                seconds = Long.parseLong(header.trim());
+            }
+        } catch (NumberFormatException ignored) {
+            // keep the default
+        }
+        seconds = Math.max(1, Math.min(300, seconds));
+        pausedUntil = System.currentTimeMillis() + seconds * 1000;
+        log("rate limited, pausing delivery for " + seconds + "s");
+    }
+
     Result deliver(Delivery delivery) {
+        if (paused()) {
+            return new Result(null, null, new RateLimitedException(), false);
+        }
         HttpRequest.Builder reqBuilder = HttpRequest.newBuilder()
             .uri(URI.create(delivery.url()))
             .timeout(configuration.getTimeout())
@@ -155,6 +251,9 @@ public class Client implements AutoCloseable {
 
         try {
             HttpResponse<String> response = httpClient.send(reqBuilder.build(), HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 429 || response.statusCode() == 503) {
+                pauseFor(response.headers().firstValue("Retry-After").orElse(null));
+            }
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 log("delivery failed with HTTP " + response.statusCode() + ": " + response.body());
             }
@@ -208,7 +307,10 @@ public class Client implements AutoCloseable {
         }
     }
 
-    record Delivery(String url, String body) {
+    record Delivery(String url, String body, int attempt) {
+        Delivery(String url, String body) {
+            this(url, body, 1);
+        }
     }
 
     public static final class Result {
