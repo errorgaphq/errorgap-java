@@ -93,6 +93,15 @@ client.notifyTransaction(transaction.setStatusCode(200));
 
 The id is thread-local; work handed to another thread needs its own scope.
 
+## Remote settings
+
+Errors and performance data can each be switched off for a project in errorgap
+(Project settings › What SDKs send). Running apps follow within ten minutes,
+with no deploy: the client re-reads `GET /api/projects/:slug/config` on a
+daemon thread. If errorgap cannot be reached, everything stays on.
+`setRemoteSettings(false)` (or `ERRORGAP_REMOTE_SETTINGS=false`) ignores the
+project's switches.
+
 ## Logback
 
 ```xml

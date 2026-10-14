@@ -26,6 +26,8 @@ public final class Configuration {
     private double apmSampleRate = 1.0;
     private List<String> ignoreEnvironments = envList("ERRORGAP_IGNORE_ENVIRONMENTS");
     private java.util.function.UnaryOperator<java.util.Map<String, Object>> beforeNotify;
+    private boolean remoteSettings = !"false".equalsIgnoreCase(
+        String.valueOf(System.getenv("ERRORGAP_REMOTE_SETTINGS")).trim());
 
     public Configuration() {
         this.endpoint = envOr("ERRORGAP_ENDPOINT", "http://127.0.0.1:3030");
@@ -95,6 +97,14 @@ public final class Configuration {
         this.apmSampleRate = Math.max(0.0, Math.min(1.0, v));
         return this;
     }
+
+    /**
+     * Follow the project's settings in errorgap (Project settings › What SDKs
+     * send): stop sending what is switched off there. On by default;
+     * {@code ERRORGAP_REMOTE_SETTINGS=false} turns it off.
+     */
+    public boolean isRemoteSettings() { return remoteSettings; }
+    public Configuration setRemoteSettings(boolean v) { this.remoteSettings = v; return this; }
 
     /** Environments in which nothing is sent. */
     public List<String> getIgnoreEnvironments() { return ignoreEnvironments; }

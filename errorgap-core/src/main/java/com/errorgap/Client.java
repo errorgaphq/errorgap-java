@@ -18,6 +18,7 @@ public class Client implements AutoCloseable {
     private final AtomicInteger inFlight = new AtomicInteger(0);
     private final Thread worker;
     private volatile boolean running = true;
+    private final RemoteSettings remote;
 
     public Client(Configuration configuration) {
         this.configuration = configuration;
@@ -25,9 +26,15 @@ public class Client implements AutoCloseable {
             .connectTimeout(configuration.getTimeout())
             .build();
         this.queue = new LinkedBlockingQueue<>(configuration.getQueueSize());
+        this.remote = new RemoteSettings(() -> this.configuration, this.httpClient);
         this.worker = new Thread(this::loop, "errorgap-delivery");
         this.worker.setDaemon(true);
         this.worker.start();
+    }
+
+    /** What errorgap wants this app to send (the project's remote settings). */
+    public RemoteSettings remoteSettings() {
+        return remote;
     }
 
     public Configuration configuration() {
@@ -51,6 +58,9 @@ public class Client implements AutoCloseable {
             configuration.validate();
             if (configuration.isIgnoredEnvironment()) {
                 return new Result(202, "ignored environment", null, false);
+            }
+            if (!remote.enabled(RemoteSettings.Kind.ERRORS)) {
+                return new Result(202, "errors are switched off for this project", null, false);
             }
             Notice notice = Notice.fromThrowable(throwable, configuration, withTransaction(options));
             java.util.Map<String, Object> payload = notice.toMap();
@@ -84,6 +94,9 @@ public class Client implements AutoCloseable {
                 || configuration.getApmSampleRate() <= 0
                 || (configuration.getApmSampleRate() < 1
                     && ThreadLocalRandom.current().nextDouble() >= configuration.getApmSampleRate())) {
+                return new Result(204, null, null, false);
+            }
+            if (!remote.enabled(RemoteSettings.Kind.APM)) {
                 return new Result(204, null, null, false);
             }
             return submit(
@@ -129,6 +142,7 @@ public class Client implements AutoCloseable {
     public void shutdown(Duration timeout) throws InterruptedException {
         flush(timeout);
         running = false;
+        remote.stop();
         worker.interrupt();
         worker.join(timeout.toMillis());
     }
