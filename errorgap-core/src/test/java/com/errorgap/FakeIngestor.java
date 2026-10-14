@@ -29,6 +29,8 @@ public final class FakeIngestor {
 
     private final HttpServer server;
     private final List<CapturedRequest> requests = new ArrayList<>();
+    /** The JSON served to the SDK's settings poll; null answers 404. */
+    public volatile String settings;
     private final int status;
     private final String responseBody;
 
@@ -41,6 +43,18 @@ public final class FakeIngestor {
         this.responseBody = responseBody;
         this.server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         this.server.createContext("/", exchange -> {
+            // The SDK's settings poll is not an ingest request: answered from
+            // `settings` (404 when unset) and not recorded.
+            if ("GET".equals(exchange.getRequestMethod())) {
+                String configured = settings;
+                byte[] body = configured == null ? new byte[0] : configured.getBytes();
+                exchange.sendResponseHeaders(configured == null ? 404 : 200, body.length == 0 ? -1 : body.length);
+                if (body.length > 0) {
+                    exchange.getResponseBody().write(body);
+                }
+                exchange.close();
+                return;
+            }
             byte[] requestBody = readAll(exchange.getRequestBody());
             Map<String, String> hdrs = new HashMap<>();
             exchange.getRequestHeaders().forEach((k, vs) -> {

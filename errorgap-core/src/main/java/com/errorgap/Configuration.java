@@ -24,6 +24,10 @@ public final class Configuration {
     private int queueSize = 100;
     private boolean apmEnabled;
     private double apmSampleRate = 1.0;
+    private List<String> ignoreEnvironments = envList("ERRORGAP_IGNORE_ENVIRONMENTS");
+    private java.util.function.UnaryOperator<java.util.Map<String, Object>> beforeNotify;
+    private boolean remoteSettings = !"false".equalsIgnoreCase(
+        String.valueOf(System.getenv("ERRORGAP_REMOTE_SETTINGS")).trim());
 
     public Configuration() {
         this.endpoint = envOr("ERRORGAP_ENDPOINT", "http://127.0.0.1:3030");
@@ -92,6 +96,47 @@ public final class Configuration {
     public Configuration setApmSampleRate(double v) {
         this.apmSampleRate = Math.max(0.0, Math.min(1.0, v));
         return this;
+    }
+
+    /**
+     * Follow the project's settings in errorgap (Project settings › What SDKs
+     * send): stop sending what is switched off there. On by default;
+     * {@code ERRORGAP_REMOTE_SETTINGS=false} turns it off.
+     */
+    public boolean isRemoteSettings() { return remoteSettings; }
+    public Configuration setRemoteSettings(boolean v) { this.remoteSettings = v; return this; }
+
+    /** Environments in which nothing is sent. */
+    public List<String> getIgnoreEnvironments() { return ignoreEnvironments; }
+    public Configuration setIgnoreEnvironments(List<String> v) {
+        this.ignoreEnvironments = v == null ? List.of() : v;
+        return this;
+    }
+
+    public boolean isIgnoredEnvironment() {
+        return environment != null && ignoreEnvironments.contains(environment);
+    }
+
+    public java.util.function.UnaryOperator<java.util.Map<String, Object>> getBeforeNotify() { return beforeNotify; }
+
+    /**
+     * Sees each notice (as a map) before it is sent and returns the notice to
+     * send, changed or not, or {@code null} to drop it.
+     */
+    public Configuration setBeforeNotify(java.util.function.UnaryOperator<java.util.Map<String, Object>> v) {
+        this.beforeNotify = v;
+        return this;
+    }
+
+    private static List<String> envList(String key) {
+        String value = System.getenv(key);
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        return java.util.Arrays.stream(value.split(","))
+            .map(String::trim)
+            .filter(name -> !name.isEmpty())
+            .toList();
     }
 
     public void validate() {

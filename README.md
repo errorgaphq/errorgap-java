@@ -13,7 +13,7 @@ Requires Java 17+.
 <dependency>
   <groupId>com.errorgap</groupId>
   <artifactId>errorgap-spring-boot-starter</artifactId>
-  <version>0.4.0</version>
+  <version>0.5.0</version>
 </dependency>
 ```
 
@@ -92,6 +92,42 @@ client.notifyTransaction(transaction.setStatusCode(200));
 ```
 
 The id is thread-local; work handed to another thread needs its own scope.
+
+## Remote settings
+
+Errors and performance data can each be switched off for a project in errorgap
+(Project settings › What SDKs send). Running apps follow within ten minutes,
+with no deploy: the client re-reads `GET /api/projects/:slug/config` on a
+daemon thread. If errorgap cannot be reached, everything stays on.
+`setRemoteSettings(false)` (or `ERRORGAP_REMOTE_SETTINGS=false`) ignores the
+project's switches.
+
+## Logback
+
+```xml
+<appender name="ERRORGAP" class="com.errorgap.logback.ErrorgapAppender"/>
+<root level="INFO"><appender-ref ref="ERRORGAP"/></root>
+```
+
+`log.error("…", exception)` reports that exception; an error event without one
+is reported as a `LoggedError`. ERROR and above unless `minimumLevel` is set.
+
+## Filtering, hooks and delivery
+
+```java
+new Configuration()
+    .setProjectSlug("my-app")
+    .setIgnoreEnvironments(List.of("test"))
+    .setBeforeNotify(notice -> {
+        // return null to drop the notice, or return it changed
+        return notice;
+    });
+```
+
+`filterKeys` are masked at any depth in `params` and `session`, inside lists
+too, and oversized values are cut. A send that fails on the network or with a
+5xx is retried up to three times; after a 429 the client stops sending for the
+server's `Retry-After`.
 
 ## Source excerpts
 
