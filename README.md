@@ -13,7 +13,7 @@ Requires Java 17+.
 <dependency>
   <groupId>com.errorgap</groupId>
   <artifactId>errorgap-spring-boot-starter</artifactId>
-  <version>0.5.0</version>
+  <version>0.5.1</version>
 </dependency>
 ```
 
