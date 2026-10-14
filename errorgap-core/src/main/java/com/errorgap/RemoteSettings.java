@@ -52,8 +52,11 @@ public final class RemoteSettings {
         };
     }
 
-    /** Fetch now, on this thread. Returns whether the settings could be read. */
-    public boolean refresh() {
+    /**
+     * Fetch now, on this thread. Returns whether the settings could be read.
+     * One read at a time, so an older answer can never overwrite a newer one.
+     */
+    public synchronized boolean refresh() {
         Configuration cfg = configuration.get();
         try {
             String base = cfg.getEndpoint().endsWith("/")
@@ -100,7 +103,15 @@ public final class RemoteSettings {
         return Pattern.compile("\"" + field + "\"\\s*:\\s*false").matcher(body).find();
     }
 
-    private synchronized void ensurePolling() {
+    private void ensurePolling() {
+        synchronized (pollerLock) {
+            startPoller();
+        }
+    }
+
+    private final Object pollerLock = new Object();
+
+    private void startPoller() {
         if (poller != null || stopped) {
             return;
         }
